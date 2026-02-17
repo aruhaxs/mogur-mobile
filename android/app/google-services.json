@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "714497985050",
+    "firebase_url": "https://mogur-4d3d4-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "mogur-4d3d4",
+    "storage_bucket": "mogur-4d3d4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:714497985050:android:b3fb414e6de032e2555fa3",
+        "android_client_info": {
+          "package_name": "com.example.mogur"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-63HWQYREp46vIK7IoPUd8jEGpk07WWY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

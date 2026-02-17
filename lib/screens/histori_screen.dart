@@ -1,5 +1,4 @@
 import 'dart:io';
-// PENTING: hide Border agar tidak bentrok dengan Flutter
 import 'package:excel/excel.dart' hide Border; 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -134,7 +133,6 @@ class _HistoriScreenState extends State<HistoriScreen> {
     });
   }
 
-  // --- LOGIKA EKSPOR EXCEL (DIPERBARUI) ---
   Future<void> _exportToExcel() async {
     if (_filteredList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -148,17 +146,17 @@ class _HistoriScreenState extends State<HistoriScreen> {
     Sheet sheet = excel[sheetName];
     excel.delete('Sheet1'); 
 
-    // 1. HEADER (Sudah dihapus Status & Raw Jarak)
     List<String> headers = [
       "No",
       "Tanggal & Waktu",
+      "Status",
       "Tinggi Air (cm)",
       "Suhu (°C)",
       "Kekeruhan (NTU)"
     ];
     sheet.appendRow(headers.map((e) => TextCellValue(e)).toList());
 
-    // 2. ISI DATA
+    // Isi Data
     for (int i = 0; i < _filteredList.length; i++) {
       var item = _filteredList[i];
       
@@ -166,16 +164,16 @@ class _HistoriScreenState extends State<HistoriScreen> {
       double suhu = (item['suhu'] ?? 0).toDouble();
       double kekeruhan = (item['kekeruhan'] ?? 0).toDouble();
       String tgl = item['datetime'] ?? "-";
+      String status = item['status'] ?? "-";
 
-      // Hitung Tinggi Air
       double tinggiAir = _totalJarak - rawJarak;
       if (tinggiAir < 0) tinggiAir = 0;
       if (tinggiAir > 100) tinggiAir = 100;
 
-      // Masukkan Data ke Baris Excel
       List<CellValue> row = [
         IntCellValue(i + 1),
         TextCellValue(tgl),
+        TextCellValue(status),
         DoubleCellValue(tinggiAir),
         DoubleCellValue(suhu),
         DoubleCellValue(kekeruhan),
@@ -339,6 +337,7 @@ class _HistoriScreenState extends State<HistoriScreen> {
     double suhu = (item['suhu'] ?? 0).toDouble();
     double kekeruhan = (item['kekeruhan'] ?? 0).toDouble();
     double rawJarak = (item['jarak'] ?? 0).toDouble();
+    String status = item['status'] ?? "Normal"; // Ambil status dari API
 
     double tinggiAir = _totalJarak - rawJarak;
     if (tinggiAir < 0) tinggiAir = 0;
@@ -353,6 +352,18 @@ class _HistoriScreenState extends State<HistoriScreen> {
     }
 
     Color colorAir = (tinggiAir < 50) ? Colors.red : (tinggiAir > 100 ? Colors.purple : Colors.blue);
+
+    Color statusColor = const Color(0xFF0077C2); // Default Biru
+
+    if (status.toLowerCase().contains("penuh") || 
+        status.toLowerCase().contains("surut") || 
+        status.toLowerCase().contains("keruh") || 
+        status.toLowerCase().contains("panas") ||
+        status.toLowerCase().contains("bahaya")) {
+      statusColor = Colors.red;
+    } else if (status.toLowerCase() == "normal") {
+      statusColor = Colors.green;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -390,9 +401,26 @@ class _HistoriScreenState extends State<HistoriScreen> {
                     ),
                   ],
                 ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: statusColor, width: 1),
+                    borderRadius: BorderRadius.circular(4),
+                    color: statusColor.withOpacity(0.05),
+                  ),
+                  child: Text(
+                    status.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
+          
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(

@@ -1,8 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'services/auth_service.dart';
+import 'services/api_service.dart';
+import 'screens/login_screen.dart';
 import 'screens/main_navigation.dart';
+import 'screens/register_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const MogurApp());
 }
 
@@ -17,7 +24,6 @@ class MogurApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0077C2)),
         useMaterial3: true,
-        // Font bisa diganti Google Fonts (Poppins/Inter) agar lebih modern
         fontFamily: 'Roboto', 
       ),
       home: const AnimatedSplashScreen(),
@@ -57,18 +63,42 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
 
     _controller.repeat(reverse: true);
 
-    Timer(const Duration(seconds: 4), () {
-      _controller.stop();
+    _checkSecurityAndNavigate();
+  }
+
+  Future<void> _checkSecurityAndNavigate() async {
+    await Future.delayed(const Duration(seconds: 3));
+
+    Widget nextScreen;
+    
+    // 1. Cek Sesi Auth di HP
+    final user = AuthService.currentUser;
+
+    if (user != null && user.emailVerified) {
+      nextScreen = const MainNavigation(); // Langsung Dashboard
+    } else {
+      // 2. Cek Database Global (Sudah ada pemilik belum?)
+      bool hasOwner = await ApiService.checkAnyUserExists();
+
+      if (hasOwner) {
+        nextScreen = const LoginScreen(); // Sudah ada -> Login
+      } else {
+        nextScreen = const RegisterScreen(); // Kosong -> Register
+      }
+    }
+
+    _controller.stop();
+    if (mounted) {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const MainNavigation(), // Arahkan ke Navigasi
+          pageBuilder: (_, __, ___) => nextScreen,
           transitionsBuilder: (_, animation, __, child) {
             return FadeTransition(opacity: animation, child: child);
           },
           transitionDuration: const Duration(milliseconds: 800),
         ),
       );
-    });
+    }
   }
 
   @override

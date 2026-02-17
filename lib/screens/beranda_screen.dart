@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart'; // PENTING: Tambahkan Import Ini
+import 'login_screen.dart';
 
 class BerandaScreen extends StatefulWidget {
   const BerandaScreen({super.key});
@@ -16,7 +18,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
       StreamController<Map<String, dynamic>>();
   Timer? _timer;
 
-  // --- DATA KOLAM ---
+  // DATA KOLAM
   DateTime _tanggalTebarBibit = DateTime.now();
   String _jenisIkan = "Gurame Soang";
   int _jumlahIkan = 500;
@@ -25,27 +27,27 @@ class _BerandaScreenState extends State<BerandaScreen> {
     "Gurame Soang", "Gurame Batu", "Gurame Bastar", "Gurame Kapas"
   ];
 
-  // --- DATA KONTROL POMPA ---
+  // KONTROL POMPA
   bool _isManualMode = false;
   double _speedPompa1 = 1023;
   double _speedPompa2 = 1023;
 
-  // --- DATA PARAMETER ---
+  // PARAMETER
   Map<String, dynamic> _params = {};
-  bool _isLoadingParams = true; 
+  bool _isLoadingParams = true;
 
   @override
   void initState() {
     super.initState();
     _loadSavedData();
-    _fetchParameters(); 
+    _fetchParameters();
     _fetchData();
     _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
       _fetchData();
     });
   }
 
-  // --- PERSISTENT DATA ---
+  // LOGIKA PENYIMPANAN DATA LOKAL
   Future<void> _loadSavedData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -63,7 +65,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
     await prefs.setInt('jumlah_ikan', _jumlahIkan);
   }
 
-  // --- FETCH DATA ---
+  // API REQUESTS
   Future<void> _fetchParameters() async {
     try {
       final params = await ApiService.getParameter();
@@ -71,13 +73,11 @@ class _BerandaScreenState extends State<BerandaScreen> {
         setState(() {
           if (params != null) {
             _params = params;
-            _isLoadingParams = false; 
+            _isLoadingParams = false;
           }
         });
       }
-    } catch (e) {
-      print("Error params: $e");
-    }
+    } catch (e) {}
   }
 
   Future<void> _fetchData() async {
@@ -92,7 +92,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
     }
   }
 
-  // --- KONTROL POMPA ---
+  // LOGIKA KONTROL POMPA
   void _toggleManualMode(bool value) {
     setState(() => _isManualMode = value);
     ApiService.updatePompaStatus(mode: value ? 'MANUAL' : 'AUTO');
@@ -117,7 +117,6 @@ class _BerandaScreenState extends State<BerandaScreen> {
     ApiService.updatePompaStatus(pompa: pompa, speed: val.toInt(), mode: 'MANUAL');
   }
 
-  // --- HELPER (PARSING AMAN) ---
   double _safeParse(dynamic value, double defaultValue) {
     if (value == null) return defaultValue;
     if (value is int) return value.toDouble();
@@ -125,7 +124,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
     return double.tryParse(value.toString()) ?? defaultValue;
   }
 
-  // --- HELPER UI ---
+  // TIMER POMPA
   void _showTimerDialog(String pompa) {
     if (!_isManualMode) {
       _showSnack("Aktifkan Mode Manual dulu");
@@ -184,6 +183,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 1)));
   }
 
+  // DIALOG EDIT INFORMASI
   void _showEditDialog() {
     String tempJenis = _jenisIkan;
     int tempJumlah = _jumlahIkan;
@@ -289,6 +289,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
     super.dispose();
   }
 
+  // BUILD UI
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -299,10 +300,33 @@ class _BerandaScreenState extends State<BerandaScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: "Keluar Akun",
             onPressed: () {
-              setState(() => _isLoadingParams = true);
-              _fetchParameters();
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Konfirmasi"),
+                  content: const Text("Apakah Anda yakin ingin keluar?"),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
+                    TextButton(
+                      onPressed: () async {
+                        // PERBAIKAN DI SINI: Gunakan AuthService
+                        await AuthService.logout(); 
+                        if (mounted) {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (context) => const LoginScreen()),
+                            (route) => false,
+                          );
+                        }
+                      },
+                      child: const Text("Ya, Keluar", style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
             },
           )
         ],
@@ -352,29 +376,18 @@ class _BerandaScreenState extends State<BerandaScreen> {
                           }
                         }
 
-                        // --- 1. AMBIL PARAMETER DARI FIREBASE ---
-                        // Parameter di Firebase adalah "Batas Jarak Sensor" (bukan tinggi air)
-                        // Max: 20 cm (Jarak sensor dekat = Air Penuh)
-                        // Min: 40 cm (Jarak sensor jauh = Air Surut)
                         double paramJarakMin = _safeParse(_params['batasjarak']?['min'], 40.0);
                         double paramJarakMax = _safeParse(_params['batasjarak']?['max'], 20.0);
-                        
                         double paramSuhuMin = _safeParse(_params['batassuhu']?['min'], 25.0);
                         double paramSuhuMax = _safeParse(_params['batassuhu']?['max'], 30.0);
                         double paramNtuMax = _safeParse(_params['bataskekeruhan']?['max'], 100.0);
 
-                        // --- 2. LOGIKA STATUS (MEMBANDINGKAN DATA MENTAH) ---
-                        // "Penuh" jika Jarak Sensor < Batas Max (Misal: 5 < 20)
                         bool isPenuh = rawJarak < paramJarakMax; 
-                        // "Surut" jika Jarak Sensor > Batas Min (Misal: 50 > 40)
                         bool isSurut = rawJarak > paramJarakMin; 
-                        
                         bool isKeruh = kekeruhan > paramNtuMax;
                         bool isPanas = suhu > paramSuhuMax;
                         bool isDingin = suhu < paramSuhuMin;
 
-                        // --- 3. LOGIKA TAMPILAN VISUAL ---
-                        // Konversi ke "Ketinggian Air" untuk User Interface
                         double ketinggianAir = 120.0 - rawJarak;
                         if (ketinggianAir < 0) ketinggianAir = 0;
 
@@ -404,25 +417,18 @@ class _BerandaScreenState extends State<BerandaScreen> {
                             _buildMainStatusAlert(isPenuh, isSurut, isPanas, isKeruh),
                             const SizedBox(height: 10),
                             
-                            // A. AIR (UPDATE: Memakai Logika Raw Sensor vs Parameter)
                             _buildDetailedSensorCard(
                               title: "Ketinggian Air",
                               value: "${ketinggianAir.toStringAsFixed(0)} cm",
-                              unit: "", // Unit disembunyikan agar bersih
+                              unit: "", 
                               icon: Icons.waves,
-                              // Jika Penuh -> Orange/Merah (Peringatan), Jika Surut -> Orange, Normal -> Biru
                               color: isPenuh ? Colors.orange : (isSurut ? Colors.red : Colors.blue),
-                              
-                              // LABEL STATUS YANG AKURAT
                               status: isPenuh ? "PENUH" : (isSurut ? "SURUT" : "NORMAL"),
-                              
-                              // Menampilkan Parameter Asli
                               paramDesc: "Normal: Jarak Sensor ${paramJarakMax.toInt()}cm - ${paramJarakMin.toInt()}cm",
                               progressVal: (ketinggianAir / 120.0).clamp(0.0, 1.0),
                             ),
                             const SizedBox(height: 12),
 
-                            // B. SUHU
                             _buildDetailedSensorCard(
                               title: "Suhu Air",
                               value: "${suhu.toStringAsFixed(1)}",
@@ -435,7 +441,6 @@ class _BerandaScreenState extends State<BerandaScreen> {
                             ),
                             const SizedBox(height: 12),
 
-                            // C. KEKERUHAN
                             _buildDetailedSensorCard(
                               title: "Kekeruhan (NTU)",
                               value: kekeruhan.toStringAsFixed(1),
@@ -501,7 +506,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
     );
   }
 
-  // --- WIDGET HELPER ---
+  // WIDGET HELPERS
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.only(left: 20, right: 20, bottom: 25, top: 10),
@@ -600,7 +605,6 @@ class _BerandaScreenState extends State<BerandaScreen> {
     String msg = "";
     Color alertColor = Colors.red;
     
-    // Logika Alert sesuai status sensor
     if (penuh) { msg = "Air Penuh (Meluap)!"; alertColor = Colors.orange; }
     else if (surut) { msg = "Air Surut!"; alertColor = Colors.red; }
     else if (panas) msg = "Suhu Tinggi!";
